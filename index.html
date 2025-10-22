@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calorie Tracker</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Configure Tailwind for the "Inter" font -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'primary': '#4f46e5',
+                        'secondary': '#1f2937',
+                        'bg-dark': '#0f172a',
+                        'card-dark': '#1e293b',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        /* Custom scrollbar for dark theme */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        
+        .shadow-glow {
+            box-shadow: 0 0 10px rgba(79, 70, 229, 0.5);
+        }
+    </style>
+</head>
+<body class="bg-bg-dark font-sans text-gray-100 min-h-screen p-4 sm:p-8 flex justify-center">
+
+    <!-- Main Container -->
+    <div class="w-full max-w-2xl">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-primary mb-2 tracking-tight">Calorie Tracker</h1>
+            <p class="text-gray-400">Track your daily intake in real-time. User ID: <span id="userIdDisplay" class="font-mono text-sm">Loading...</span></p>
+        </header>
+
+        <!-- Date Navigation -->
+        <div class="flex items-center justify-between bg-card-dark p-4 rounded-xl shadow-lg mb-6 shadow-primary/20">
+            <button id="prevDayBtn" class="p-2 rounded-full hover:bg-gray-700 transition duration-150 text-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                </svg>
+            </button>
+            <h2 id="currentDateDisplay" class="text-xl font-semibold text-white">Today</h2>
+            <button id="nextDayBtn" class="p-2 rounded-full hover:bg-gray-700 transition duration-150 text-primary" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+            </button>
+        </div>
+
+        <!-- Total Calories Card -->
+        <div class="bg-card-dark p-6 rounded-xl shadow-lg mb-8 border-l-4 border-primary transition transform hover:scale-[1.01] shadow-glow">
+            <div class="flex justify-between items-center">
+                <p class="text-lg text-gray-400 font-medium">Total Calories Consumed</p>
+                <span id="totalCalories" class="text-4xl font-extrabold text-primary">0</span>
+            </div>
+            <div id="loadingIndicator" class="mt-4 text-center hidden">
+                <div class="animate-spin inline-block w-6 h-6 border-4 border-primary border-t-transparent rounded-full"></div>
+                <p class="text-sm mt-1 text-gray-400">Loading entries...</p>
+            </div>
+        </div>
+
+        <!-- Add Entry Form -->
+        <div class="bg-card-dark p-6 rounded-xl shadow-lg mb-8">
+            <h3 class="text-2xl font-semibold mb-4 text-white">Add Food Entry</h3>
+            <form id="addEntryForm" class="space-y-4">
+                
+                <!-- Food Name and Lookup Button -->
+                <div>
+                    <label for="foodName" class="block text-sm font-medium text-gray-300 mb-1">Food Name</label>
+                    <div class="flex space-x-2">
+                        <input type="text" id="foodName" name="foodName" required 
+                               class="flex-grow p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-primary focus:border-primary placeholder-gray-400 text-white transition">
+                        <button type="button" id="lookupBtn" class="shrink-0 px-4 py-3 bg-gray-700 text-white font-medium rounded-lg hover:bg-gray-600 transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-wait flex items-center justify-center space-x-2">
+                            <span id="lookupBtnIcon" class="hidden animate-spin h-5 w-5 border-4 border-white border-t-transparent rounded-full"></span>
+                            <span id="lookupBtnText">Lookup</span>
+                        </button>
+                    </div>
+                    <div id="lookupMessage" class="text-xs mt-2 h-4 text-red-400"></div>
+                </div>
+                
+                <!-- Calories Input -->
+                <div>
+                    <label for="calories" class="block text-sm font-medium text-gray-300 mb-1">Calories (kcal)</label>
+                    <input type="number" id="calories" name="calories" required min="1"
+                           class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-primary focus:border-primary placeholder-gray-400 text-white transition">
+                </div>
+
+                <button type="submit" class="w-full py-3 bg-primary text-white font-bold rounded-lg hover:bg-primary/90 transition duration-300 ease-in-out shadow-md shadow-primary/50 flex items-center justify-center space-x-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+                    </svg>
+                    <span>Add Entry</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Food Entries List -->
+        <div class="bg-card-dark p-6 rounded-xl shadow-lg">
+            <h3 class="text-2xl font-semibold mb-4 text-white">Entries for the Day</h3>
+            <div id="foodEntriesList" class="space-y-3 max-h-96 overflow-y-auto">
+                <!-- Entries will be dynamically inserted here -->
+            </div>
+            <div id="noEntriesMessage" class="text-center p-8 text-gray-500 italic hidden">
+                <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-8 w-8 text-gray-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p>No food entries logged for this date.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK Imports and Core Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, query, where, onSnapshot, addDoc, deleteDoc, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Set Firestore log level to Debug for visibility
+        setLogLevel('Debug');
+        
+        // --- GEMINI API Configuration ---
+        const API_KEY = ""; // Canvas provides this dynamically
+        const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent";
+
+
+        // --- GLOBAL VARIABLES (Provided by Canvas Environment) ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-calorie-tracker-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth;
+        let currentUserId = null;
+        let unsubscribeSnapshot = null;
+        let today = getLocalMidnight(new Date()); // Date object representing midnight of current day in local time
+        let currentDate = new Date(today.getTime()); // State for the currently viewed date
+
+        // --- UTILITY FUNCTIONS ---
+
+        /**
+         * Returns a Date object representing midnight (00:00:00) of the given date in local time.
+         * This is essential for Firestore queries to consistently represent the start of a day.
+         * @param {Date} date - The input date.
+         * @returns {Date} The date at local midnight.
+         */
+        function getLocalMidnight(date) {
+            const d = new Date(date.getTime());
+            d.setHours(0, 0, 0, 0);
+            return d;
+        }
+
+        /**
+         * Formats a Date object into a readable string (e.g., "Mon, Oct 22, 2025").
+         * @param {Date} date - The date to format.
+         * @returns {string} The formatted date string.
+         */
+        function formatDate(date) {
+            const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+            const formatted = date.toLocaleDateString('en-US', options);
+
+            // Check if it's today
+            if (date.getTime() === today.getTime()) {
+                return `Today, ${formatted}`;
+            }
+            // Check if it's yesterday
+            const yesterday = new Date(today.getTime());
+            yesterday.setDate(today.getDate() - 1);
+            if (date.getTime() === yesterday.getTime()) {
+                return `Yesterday, ${formatted}`;
+            }
+
+            return formatted;
+        }
+
+        /**
+         * Renders the current state (list and total) to the DOM.
+         * @param {Array<Object>} entries - The list of food entry objects.
+         */
+        function renderApp(entries) {
+            const listContainer = document.getElementById('foodEntriesList');
+            const totalCaloriesEl = document.getElementById('totalCalories');
+            const noEntriesMessage = document.getElementById('noEntriesMessage');
+            
+            // 1. Calculate Total Calories
+            const totalCalories = entries.reduce((sum, entry) => sum + (entry.calories || 0), 0);
+            totalCaloriesEl.textContent = totalCalories;
+
+            // 2. Render List
+            listContainer.innerHTML = '';
+            if (entries.length === 0) {
+                noEntriesMessage.classList.remove('hidden');
+            } else {
+                noEntriesMessage.classList.add('hidden');
+                
+                // Sort in memory by timestamp (newest first)
+                entries.sort((a, b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0));
+
+                entries.forEach(entry => {
+                    const entryEl = document.createElement('div');
+                    entryEl.className = 'flex justify-between items-center bg-gray-800 p-3 rounded-lg border-l-4 border-primary/50 hover:bg-gray-700/50 transition';
+                    entryEl.innerHTML = `
+                        <div>
+                            <p class="text-white font-semibold">${entry.foodName}</p>
+                            <p class="text-xs text-gray-400">${entry.timestamp ? entry.timestamp.toDate().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Unknown Time'}</p>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="text-lg font-bold text-primary">${entry.calories} kcal</span>
+                            <button data-doc-id="${entry.id}" class="delete-btn text-gray-400 hover:text-red-500 transition p-1 rounded-full">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>
+                    `;
+                    listContainer.appendChild(entryEl);
+                });
+            }
+
+            // 3. Update Date Display
+            document.getElementById('currentDateDisplay').textContent = formatDate(currentDate);
+            
+            // 4. Update Next Day Button State
+            const nextDayBtn = document.getElementById('nextDayBtn');
+            nextDayBtn.disabled = currentDate.getTime() >= today.getTime();
+            nextDayBtn.classList.toggle('opacity-50', nextDayBtn.disabled);
+            nextDayBtn.classList.toggle('hover:bg-gray-700', !nextDayBtn.disabled);
+            nextDayBtn.classList.toggle('cursor-not-allowed', nextDayBtn.disabled);
+        }
+
+        /**
+         * Sets up the real-time listener for food entries in Firestore.
+         */
+        function setupEntryListener() {
+            if (!db || !currentUserId) return;
+            
+            // Unsubscribe from any previous listener
+            if (unsubscribeSnapshot) {
+                unsubscribeSnapshot();
+            }
+
+            const entriesColRef = collection(db, `artifacts/${appId}/users/${currentUserId}/food_entries`);
+            
+            // Calculate the start and end of the current day for the query
+            const startOfDay = currentDate;
+            const endOfDay = new Date(startOfDay.getTime());
+            endOfDay.setDate(startOfDay.getDate() + 1); // Up to, but not including, the next day
+
+            // Create a query to filter entries by date range
+            const q = query(
+                entriesColRef,
+                where('dayStartTime', '>=', startOfDay),
+                where('dayStartTime', '<', endOfDay)
+                // Note: Not using orderBy here to avoid index requirements in this simple app
+            );
+            
+            document.getElementById('loadingIndicator').classList.remove('hidden');
+
+            // Set up the new real-time listener
+            unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
+                document.getElementById('loadingIndicator').classList.add('hidden');
+                
+                const entries = [];
+                snapshot.forEach(doc => {
+                    entries.push({ id: doc.id, ...doc.data() });
+                });
+                renderApp(entries);
+            }, (error) => {
+                console.error("Error fetching documents: ", error);
+                document.getElementById('loadingIndicator').classList.add('hidden');
+                // Use custom message display instead of alert in a final application
+                console.error('Error loading data. Check console for details.'); 
+            });
+        }
+
+        /**
+         * Looks up calorie information for a given food item using the Gemini API.
+         */
+        async function lookupCalories() {
+            const foodNameInput = document.getElementById('foodName');
+            const caloriesInput = document.getElementById('calories');
+            const lookupBtn = document.getElementById('lookupBtn');
+            const lookupBtnText = document.getElementById('lookupBtnText');
+            const lookupBtnIcon = document.getElementById('lookupBtnIcon');
+            const lookupMessage = document.getElementById('lookupMessage');
+
+            const foodName = foodNameInput.value.trim();
+            if (!foodName) {
+                lookupMessage.textContent = "Please enter a food name first.";
+                return;
+            }
+
+            // UI State: Loading
+            lookupBtn.disabled = true;
+            lookupBtnText.textContent = 'Searching...';
+            lookupBtnIcon.classList.remove('hidden');
+            lookupMessage.className = 'text-xs mt-2 h-4 text-gray-400';
+            lookupMessage.textContent = 'Searching the web...';
+            caloriesInput.value = ''; // Clear previous value
+
+            const userQuery = `Find the most common calorie count for one serving of "${foodName}". ONLY return a single number representing the calorie count (kcal). Do not include any text, units, explanation, or punctuation. If you cannot find a number, return the text 'NOT_FOUND'.`;
+            
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                tools: [{ "google_search": {} }],
+                systemInstruction: {
+                    parts: [{ text: "You are an accurate calorie lookup tool. Your only task is to return a raw integer representing the calorie count based on the user's query and grounded search results. Respond with 'NOT_FOUND' if a numerical value cannot be reliably determined. Do not include units like 'kcal' or any other text." }]
+                },
+                generationConfig: {
+                    temperature: 0.0 // Ensure deterministic, factual response
+                }
+            };
+            
+            const maxRetries = 3;
+            let attempt = 0;
+            let resultText = 'NOT_FOUND';
+
+            while (attempt < maxRetries) {
+                try {
+                    const response = await fetch(`${API_URL}?key=${API_KEY}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    const text = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'NOT_FOUND';
+                    resultText = text;
+                    break; // Success, exit loop
+
+                } catch (error) {
+                    // Log error but do not display it via alert
+                    console.error(`Attempt ${attempt + 1} failed:`, error);
+                    attempt++;
+                    if (attempt < maxRetries) {
+                        const delay = Math.pow(2, attempt) * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                }
+            }
+            
+            // UI State: Finished
+            lookupBtn.disabled = false;
+            lookupBtnText.textContent = 'Lookup';
+            lookupBtnIcon.classList.add('hidden');
+            lookupMessage.className = 'text-xs mt-2 h-4';
+
+
+            // Process Result
+            if (resultText === 'NOT_FOUND') {
+                lookupMessage.className += ' text-red-400';
+                lookupMessage.textContent = `Could not find a reliable calorie count for "${foodName}". Please enter manually.`;
+                caloriesInput.focus();
+            } else {
+                // Attempt to parse the result as an integer
+                const calorieValue = parseInt(resultText, 10);
+                if (isNaN(calorieValue) || calorieValue < 1) {
+                    lookupMessage.className += ' text-yellow-400';
+                    lookupMessage.textContent = `Search result was unclear. Please verify and enter calories manually.`;
+                    caloriesInput.focus();
+                } else {
+                    caloriesInput.value = calorieValue;
+                    lookupMessage.className += ' text-green-400';
+                    lookupMessage.textContent = `Found ${calorieValue} kcal! Adjust if needed.`;
+                    // Automatically shift focus to the Add Entry button for quick submission
+                    document.querySelector('#addEntryForm button[type="submit"]').focus(); 
+                }
+            }
+        }
+
+        /**
+         * Adds a new food entry to Firestore.
+         * @param {Event} e - The form submission event.
+         */
+        async function addEntry(e) {
+            e.preventDefault();
+            if (!db || !currentUserId) {
+                console.error("Firebase not initialized or user not logged in.");
+                return;
+            }
+
+            const form = e.target;
+            const foodName = form.foodName.value.trim();
+            const calories = parseInt(form.calories.value, 10);
+
+            if (foodName === "" || isNaN(calories) || calories <= 0) return;
+            
+            // The date to save should be the currently viewed date's start (local midnight)
+            const dayStartTime = getLocalMidnight(currentDate);
+
+            try {
+                const entriesColRef = collection(db, `artifacts/${appId}/users/${currentUserId}/food_entries`);
+                await addDoc(entriesColRef, {
+                    foodName: foodName,
+                    calories: calories,
+                    timestamp: serverTimestamp(), // Record the exact time of entry
+                    dayStartTime: dayStartTime, // Store local midnight for easy querying
+                    userId: currentUserId,
+                });
+
+                // Clear the form only on success
+                form.reset();
+                form.foodName.focus();
+                document.getElementById('lookupMessage').textContent = ''; // Clear lookup message
+                
+            } catch (error) {
+                console.error("Error adding document: ", error);
+                // Use console.error instead of alert
+                console.error('Failed to save entry. Check console for details.'); 
+            }
+        }
+        
+        /**
+         * Deletes a food entry from Firestore.
+         * @param {string} docId - The ID of the document to delete.
+         */
+        async function deleteEntry(docId) {
+            if (!db || !currentUserId || !docId) return;
+
+            // In a real app, this would be a custom modal, but for brevity we use console log
+            console.log(`Attempting to delete entry with ID: ${docId}`);
+
+            try {
+                const docRef = doc(db, `artifacts/${appId}/users/${currentUserId}/food_entries`, docId);
+                await deleteDoc(docRef);
+            } catch (error) {
+                console.error("Error deleting document: ", error);
+                // Use console.error instead of alert
+                console.error('Failed to delete entry. Check console for details.');
+            }
+        }
+
+        /**
+         * Changes the currently viewed date and updates the listener.
+         * @param {number} days - Number of days to change (e.g., -1 for previous day, +1 for next day).
+         */
+        function changeDate(days) {
+            const newDate = new Date(currentDate.getTime());
+            newDate.setDate(currentDate.getDate() + days);
+            
+            // Prevent navigating past today
+            if (newDate.getTime() > today.getTime()) {
+                // If trying to go past today, set it to today.
+                currentDate = today;
+            } else {
+                currentDate = newDate;
+            }
+            
+            // Re-setup the listener for the new date
+            setupEntryListener();
+        }
+
+        // --- FIREBASE INITIALIZATION & AUTHENTICATION ---
+
+        async function initFirebase() {
+            if (!firebaseConfig) {
+                console.error("Firebase configuration not available.");
+                document.getElementById('userIdDisplay').textContent = "ERROR: Config Missing";
+                return;
+            }
+            
+            // 1. Initialize Firebase App and Services
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            
+            document.getElementById('userIdDisplay').textContent = "Authenticating...";
+
+            // 2. Authentication
+            try {
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Authentication failed: ", error);
+                document.getElementById('userIdDisplay').textContent = "AUTH ERROR";
+                return;
+            }
+
+            // 3. Auth State Listener
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUserId = user.uid;
+                    document.getElementById('userIdDisplay').textContent = currentUserId;
+                    // 4. Setup Firestore Listener once user is authenticated
+                    setupEntryListener(); 
+                } else {
+                    currentUserId = null;
+                    document.getElementById('userIdDisplay').textContent = "Logged Out";
+                    if (unsubscribeSnapshot) {
+                        unsubscribeSnapshot(); // Stop listening if user logs out
+                    }
+                }
+            });
+        }
+
+        // --- EVENT LISTENERS ---
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            initFirebase();
+
+            // Form submission listener
+            document.getElementById('addEntryForm').addEventListener('submit', addEntry);
+            
+            // Date navigation listeners
+            document.getElementById('prevDayBtn').addEventListener('click', () => changeDate(-1));
+            document.getElementById('nextDayBtn').addEventListener('click', () => changeDate(1));
+            
+            // Add listener for the new lookup button
+            document.getElementById('lookupBtn').addEventListener('click', lookupCalories);
+            
+            // Delegate click listener for delete buttons
+            document.getElementById('foodEntriesList').addEventListener('click', (e) => {
+                const deleteBtn = e.target.closest('.delete-btn');
+                if (deleteBtn) {
+                    const docId = deleteBtn.getAttribute('data-doc-id');
+                    // Note: Replaced confirm() with console log as per instructions
+                    console.log(`User confirmed deletion of entry: ${docId}`); 
+                    deleteEntry(docId);
+                }
+            });
+        });
+
+    </script>
+</body>
+</html>
