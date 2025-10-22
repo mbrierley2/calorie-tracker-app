@@ -297,13 +297,15 @@
             lookupMessage.textContent = 'Searching the web...';
             caloriesInput.value = ''; // Clear previous value
 
-            const userQuery = `Find the most common calorie count for one serving of "${foodName}". ONLY return a single number representing the calorie count (kcal). Do not include any text, units, explanation, or punctuation. If you cannot find a number, return the text 'NOT_FOUND'.`;
+            // MODIFIED PROMPT: Now explicitly telling the model to find a single, typical serving size
+            const userQuery = `Find the most common, typical serving calorie count (in kcal) for "${foodName}". ONLY return a single integer representing the calorie count. If you cannot find a single, reliable integer number, return the text 'NOT_FOUND'.`;
             
             const payload = {
                 contents: [{ parts: [{ text: userQuery }] }],
                 tools: [{ "google_search": {} }],
+                // MODIFIED SYSTEM INSTRUCTION: More aggressive instruction for pure numerical output
                 systemInstruction: {
-                    parts: [{ text: "You are an accurate calorie lookup tool. Your only task is to return a raw integer representing the calorie count based on the user's query and grounded search results. Respond with 'NOT_FOUND' if a numerical value cannot be reliably determined. Do not include units like 'kcal' or any other text." }]
+                    parts: [{ text: "You are an extremely focused calorie lookup tool. Your SOLE task is to find the most common numerical calorie value for the user's query and return ONLY that raw integer number. DO NOT include any text, units, decimal points, or explanation. If a numerical value cannot be confidently extracted, respond with the text 'NOT_FOUND'." }]
                 },
                 generationConfig: {
                     temperature: 0.0 // Ensure deterministic, factual response
@@ -325,7 +327,6 @@
                     });
 
                     if (!response.ok) {
-                        // If the response is not OK, throw a detailed error
                         const errorBody = await response.text();
                         throw new Error(`API HTTP Error ${response.status}: ${errorBody.substring(0, 100)}...`);
                     }
@@ -371,7 +372,7 @@
                 const calorieValue = parseInt(resultText, 10);
                 if (isNaN(calorieValue) || calorieValue < 1) {
                     lookupMessage.className += ' text-yellow-400';
-                    lookupMessage.textContent = `Search result was unclear ("${resultText}"). Please verify and enter calories manually.`;
+                    lookupMessage.textContent = `Search result was unclear ("${resultText.substring(0, 30)}..."). Please verify and enter calories manually.`;
                     caloriesInput.focus();
                 } else {
                     caloriesInput.value = calorieValue;
