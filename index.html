@@ -133,8 +133,8 @@
         setLogLevel('Debug');
         
         // --- GEMINI API Configuration ---
-        // Switched to gemini-2.5-flash which is more reliably authorized for Grounding in this environment.
-        const API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"; 
+        // Using the recommended preview model, regardless of the 403 error.
+        const API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent"; 
 
 
         // --- GLOBAL VARIABLES (Provided by Canvas Environment) ---
@@ -335,6 +335,12 @@
                         const errorBody = await response.text();
                         console.error(`Attempt ${attempt} failed with HTTP Status ${response.status}: ${errorBody.substring(0, 100)}...`);
                         
+                        if (response.status === 403) {
+                             // CRITICAL: Stop retrying if it's a permanent permission error
+                             resultText = 'AUTH_403'; 
+                             break; 
+                        }
+
                         if (attempt === maxRetries) {
                              throw new Error('Exhausted all retries due to persistent HTTP errors.');
                         }
@@ -370,6 +376,10 @@
                 lookupMessage.className += ' text-red-400';
                 lookupMessage.textContent = `Could not find a reliable calorie count for "${foodName}". Please enter manually.`;
                 caloriesInput.focus();
+            } else if (resultText === 'AUTH_403') {
+                 lookupMessage.className += ' text-red-400';
+                 lookupMessage.textContent = 'Automated lookup is blocked (403 Authorization Error). Please enter calories manually.';
+                 caloriesInput.focus();
             } else if (resultText === 'API_FAILURE') {
                  lookupMessage.className += ' text-red-400';
                  lookupMessage.textContent = 'Network or API error occurred. Please check your connection and try again.';
