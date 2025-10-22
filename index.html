@@ -133,9 +133,8 @@
         setLogLevel('Debug');
         
         // --- GEMINI API Configuration ---
-        // The API key is sourced from the environment if present.
         const API_KEY = ""; 
-        const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent";
+        const API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent";
 
 
         // --- GLOBAL VARIABLES (Provided by Canvas Environment) ---
@@ -297,28 +296,34 @@
             lookupMessage.textContent = 'Searching the web...';
             caloriesInput.value = ''; // Clear previous value
 
-            // MODIFIED PROMPT: Now explicitly telling the model to find a single, typical serving size
+            // Prompt and Payload (Unchanged from last successful version)
             const userQuery = `Find the most common, typical serving calorie count (in kcal) for "${foodName}". ONLY return a single integer representing the calorie count. If you cannot find a single, reliable integer number, return the text 'NOT_FOUND'.`;
             
             const payload = {
                 contents: [{ parts: [{ text: userQuery }] }],
                 tools: [{ "google_search": {} }],
-                // MODIFIED SYSTEM INSTRUCTION: More aggressive instruction for pure numerical output
                 systemInstruction: {
                     parts: [{ text: "You are an extremely focused calorie lookup tool. Your SOLE task is to find the most common numerical calorie value for the user's query and return ONLY that raw integer number. DO NOT include any text, units, decimal points, or explanation. If a numerical value cannot be confidently extracted, respond with the text 'NOT_FOUND'." }]
                 },
                 generationConfig: {
-                    temperature: 0.0 // Ensure deterministic, factual response
+                    temperature: 0.0
                 }
             };
             
             const maxRetries = 3;
             let attempt = 0;
-            let resultText = 'NOT_FOUND';
+            let resultText = 'API_FAILURE'; // Initialize to failure state
+            const url = `${API_BASE_URL}?key=${API_KEY}`;
+
 
             while (attempt < maxRetries) {
+                attempt++;
                 try {
-                    const url = `${API_URL}?key=${API_KEY}`;
+                    if (attempt > 1) {
+                         const delay = Math.pow(2, attempt) * 100; // 400ms, 800ms, etc.
+                         console.warn(`Retry attempt ${attempt}/${maxRetries}. Waiting ${delay}ms...`);
+                         await new Promise(resolve => setTimeout(resolve, delay));
+                    }
                     
                     const response = await fetch(url, {
                         method: 'POST',
@@ -326,32 +331,40 @@
                         body: JSON.stringify(payload)
                     });
 
+                    // Check for HTTP errors (e.g., 429, 500 series) which might be transient
                     if (!response.ok) {
                         const errorBody = await response.text();
-                        throw new Error(`API HTTP Error ${response.status}: ${errorBody.substring(0, 100)}...`);
+                        console.error(`Attempt ${attempt} failed with HTTP Status ${response.status}: ${errorBody.substring(0, 100)}...`);
+                        
+                        // If it's the last attempt, break and report failure, otherwise continue to retry
+                        if (attempt === maxRetries) {
+                             throw new Error('Exhausted all retries due to persistent HTTP errors.');
+                        }
+                        // Important: continue to next loop iteration for retry with backoff
+                        continue; 
                     }
 
                     const result = await response.json();
                     
-                    // CRITICAL FIX: Ensure safe access to the nested text part.
+                    // Successful API call, now check content
                     const text = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'NOT_FOUND';
-                    
                     resultText = text;
                     break; // Success, exit loop
 
                 } catch (error) {
-                    console.error(`Attempt ${attempt + 1} failed:`, error.message);
-                    attempt++;
-                    if (attempt < maxRetries) {
-                        const delay = Math.pow(2, attempt) * 1000;
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                    } else {
-                        resultText = 'API_FAILURE'; // Mark as a network/API infrastructure failure
+                    console.error(`Attempt ${attempt} failed (Network/Fetch Error):`, error.message);
+                    
+                    // If it's the last attempt, break and report failure
+                    if (attempt === maxRetries) {
+                         // resultText remains 'API_FAILURE'
+                         break;
                     }
+                    // Continue to next loop iteration for retry with backoff
+                    continue; 
                 }
             }
             
-            // UI State: Finished
+            // --- UI State: Finished ---
             lookupBtn.disabled = false;
             lookupBtnText.textContent = 'Lookup';
             lookupBtnIcon.classList.add('hidden');
