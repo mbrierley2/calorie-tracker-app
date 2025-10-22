@@ -126,14 +126,15 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, collection, query, where, onSnapshot, addDoc, deleteDoc, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, collection, query, where, onSnapshot, addDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Set Firestore log level to Debug for visibility
         setLogLevel('Debug');
         
         // --- GEMINI API Configuration ---
-        const API_KEY = ""; // Canvas provides this dynamically
+        // The API key is sourced from the environment if present.
+        const API_KEY = ""; 
         const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent";
 
 
@@ -152,9 +153,6 @@
 
         /**
          * Returns a Date object representing midnight (00:00:00) of the given date in local time.
-         * This is essential for Firestore queries to consistently represent the start of a day.
-         * @param {Date} date - The input date.
-         * @returns {Date} The date at local midnight.
          */
         function getLocalMidnight(date) {
             const d = new Date(date.getTime());
@@ -163,19 +161,15 @@
         }
 
         /**
-         * Formats a Date object into a readable string (e.g., "Mon, Oct 22, 2025").
-         * @param {Date} date - The date to format.
-         * @returns {string} The formatted date string.
+         * Formats a Date object into a readable string.
          */
         function formatDate(date) {
             const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
             const formatted = date.toLocaleDateString('en-US', options);
 
-            // Check if it's today
             if (date.getTime() === today.getTime()) {
                 return `Today, ${formatted}`;
             }
-            // Check if it's yesterday
             const yesterday = new Date(today.getTime());
             yesterday.setDate(today.getDate() - 1);
             if (date.getTime() === yesterday.getTime()) {
@@ -187,7 +181,6 @@
 
         /**
          * Renders the current state (list and total) to the DOM.
-         * @param {Array<Object>} entries - The list of food entry objects.
          */
         function renderApp(entries) {
             const listContainer = document.getElementById('foodEntriesList');
@@ -246,29 +239,24 @@
         function setupEntryListener() {
             if (!db || !currentUserId) return;
             
-            // Unsubscribe from any previous listener
             if (unsubscribeSnapshot) {
                 unsubscribeSnapshot();
             }
 
             const entriesColRef = collection(db, `artifacts/${appId}/users/${currentUserId}/food_entries`);
             
-            // Calculate the start and end of the current day for the query
             const startOfDay = currentDate;
             const endOfDay = new Date(startOfDay.getTime());
-            endOfDay.setDate(startOfDay.getDate() + 1); // Up to, but not including, the next day
+            endOfDay.setDate(startOfDay.getDate() + 1); 
 
-            // Create a query to filter entries by date range
             const q = query(
                 entriesColRef,
                 where('dayStartTime', '>=', startOfDay),
                 where('dayStartTime', '<', endOfDay)
-                // Note: Not using orderBy here to avoid index requirements in this simple app
             );
             
             document.getElementById('loadingIndicator').classList.remove('hidden');
 
-            // Set up the new real-time listener
             unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
                 document.getElementById('loadingIndicator').classList.add('hidden');
                 
@@ -280,7 +268,6 @@
             }, (error) => {
                 console.error("Error fetching documents: ", error);
                 document.getElementById('loadingIndicator').classList.add('hidden');
-                // Use custom message display instead of alert in a final application
                 console.error('Error loading data. Check console for details.'); 
             });
         }
@@ -329,28 +316,36 @@
 
             while (attempt < maxRetries) {
                 try {
-                    const response = await fetch(`${API_URL}?key=${API_KEY}`, {
+                    const url = `${API_URL}?key=${API_KEY}`;
+                    
+                    const response = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
 
                     if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                        // If the response is not OK, throw a detailed error
+                        const errorBody = await response.text();
+                        throw new Error(`API HTTP Error ${response.status}: ${errorBody.substring(0, 100)}...`);
                     }
 
                     const result = await response.json();
+                    
+                    // CRITICAL FIX: Ensure safe access to the nested text part.
                     const text = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'NOT_FOUND';
+                    
                     resultText = text;
                     break; // Success, exit loop
 
                 } catch (error) {
-                    // Log error but do not display it via alert
-                    console.error(`Attempt ${attempt + 1} failed:`, error);
+                    console.error(`Attempt ${attempt + 1} failed:`, error.message);
                     attempt++;
                     if (attempt < maxRetries) {
                         const delay = Math.pow(2, attempt) * 1000;
                         await new Promise(resolve => setTimeout(resolve, delay));
+                    } else {
+                        resultText = 'API_FAILURE'; // Mark as a network/API infrastructure failure
                     }
                 }
             }
@@ -367,12 +362,16 @@
                 lookupMessage.className += ' text-red-400';
                 lookupMessage.textContent = `Could not find a reliable calorie count for "${foodName}". Please enter manually.`;
                 caloriesInput.focus();
+            } else if (resultText === 'API_FAILURE') {
+                 lookupMessage.className += ' text-red-400';
+                 lookupMessage.textContent = 'Network or API error occurred. Please check your connection and try again.';
+                 caloriesInput.focus();
             } else {
                 // Attempt to parse the result as an integer
                 const calorieValue = parseInt(resultText, 10);
                 if (isNaN(calorieValue) || calorieValue < 1) {
                     lookupMessage.className += ' text-yellow-400';
-                    lookupMessage.textContent = `Search result was unclear. Please verify and enter calories manually.`;
+                    lookupMessage.textContent = `Search result was unclear ("${resultText}"). Please verify and enter calories manually.`;
                     caloriesInput.focus();
                 } else {
                     caloriesInput.value = calorieValue;
@@ -386,7 +385,6 @@
 
         /**
          * Adds a new food entry to Firestore.
-         * @param {Event} e - The form submission event.
          */
         async function addEntry(e) {
             e.preventDefault();
@@ -401,7 +399,6 @@
 
             if (foodName === "" || isNaN(calories) || calories <= 0) return;
             
-            // The date to save should be the currently viewed date's start (local midnight)
             const dayStartTime = getLocalMidnight(currentDate);
 
             try {
@@ -409,31 +406,27 @@
                 await addDoc(entriesColRef, {
                     foodName: foodName,
                     calories: calories,
-                    timestamp: serverTimestamp(), // Record the exact time of entry
-                    dayStartTime: dayStartTime, // Store local midnight for easy querying
+                    timestamp: serverTimestamp(), 
+                    dayStartTime: dayStartTime, 
                     userId: currentUserId,
                 });
 
-                // Clear the form only on success
                 form.reset();
                 form.foodName.focus();
-                document.getElementById('lookupMessage').textContent = ''; // Clear lookup message
+                document.getElementById('lookupMessage').textContent = ''; 
                 
             } catch (error) {
                 console.error("Error adding document: ", error);
-                // Use console.error instead of alert
                 console.error('Failed to save entry. Check console for details.'); 
             }
         }
         
         /**
          * Deletes a food entry from Firestore.
-         * @param {string} docId - The ID of the document to delete.
          */
         async function deleteEntry(docId) {
             if (!db || !currentUserId || !docId) return;
 
-            // In a real app, this would be a custom modal, but for brevity we use console log
             console.log(`Attempting to delete entry with ID: ${docId}`);
 
             try {
@@ -441,28 +434,23 @@
                 await deleteDoc(docRef);
             } catch (error) {
                 console.error("Error deleting document: ", error);
-                // Use console.error instead of alert
                 console.error('Failed to delete entry. Check console for details.');
             }
         }
 
         /**
          * Changes the currently viewed date and updates the listener.
-         * @param {number} days - Number of days to change (e.g., -1 for previous day, +1 for next day).
          */
         function changeDate(days) {
             const newDate = new Date(currentDate.getTime());
             newDate.setDate(currentDate.getDate() + days);
             
-            // Prevent navigating past today
             if (newDate.getTime() > today.getTime()) {
-                // If trying to go past today, set it to today.
                 currentDate = today;
             } else {
                 currentDate = newDate;
             }
             
-            // Re-setup the listener for the new date
             setupEntryListener();
         }
 
@@ -475,14 +463,12 @@
                 return;
             }
             
-            // 1. Initialize Firebase App and Services
             const app = initializeApp(firebaseConfig);
             db = getFirestore(app);
             auth = getAuth(app);
             
             document.getElementById('userIdDisplay').textContent = "Authenticating...";
 
-            // 2. Authentication
             try {
                 if (initialAuthToken) {
                     await signInWithCustomToken(auth, initialAuthToken);
@@ -495,18 +481,16 @@
                 return;
             }
 
-            // 3. Auth State Listener
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     currentUserId = user.uid;
                     document.getElementById('userIdDisplay').textContent = currentUserId;
-                    // 4. Setup Firestore Listener once user is authenticated
                     setupEntryListener(); 
                 } else {
                     currentUserId = null;
                     document.getElementById('userIdDisplay').textContent = "Logged Out";
                     if (unsubscribeSnapshot) {
-                        unsubscribeSnapshot(); // Stop listening if user logs out
+                        unsubscribeSnapshot(); 
                     }
                 }
             });
@@ -517,23 +501,15 @@
         document.addEventListener('DOMContentLoaded', () => {
             initFirebase();
 
-            // Form submission listener
             document.getElementById('addEntryForm').addEventListener('submit', addEntry);
-            
-            // Date navigation listeners
             document.getElementById('prevDayBtn').addEventListener('click', () => changeDate(-1));
             document.getElementById('nextDayBtn').addEventListener('click', () => changeDate(1));
-            
-            // Add listener for the new lookup button
             document.getElementById('lookupBtn').addEventListener('click', lookupCalories);
             
-            // Delegate click listener for delete buttons
             document.getElementById('foodEntriesList').addEventListener('click', (e) => {
                 const deleteBtn = e.target.closest('.delete-btn');
                 if (deleteBtn) {
                     const docId = deleteBtn.getAttribute('data-doc-id');
-                    // Note: Replaced confirm() with console log as per instructions
-                    console.log(`User confirmed deletion of entry: ${docId}`); 
                     deleteEntry(docId);
                 }
             });
